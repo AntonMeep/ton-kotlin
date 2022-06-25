@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.ton.api.adnl.message.AdnlMessageAnswer
 import org.ton.api.adnl.message.AdnlMessageQuery
+import org.ton.bigint.BigInt
 import org.ton.crypto.hex
 import org.ton.crypto.sha256
 import org.ton.logger.Logger
@@ -31,7 +32,7 @@ abstract class AdnlTcpClient(
 
     protected lateinit var job: Job
     private val sendFlow = MutableSharedFlow<AdnlMessageQuery>()
-    private val queryMap = ConcurrentMap<ByteArray, CompletableDeferred<AdnlMessageAnswer>>()
+    private val queryMap = ConcurrentMap<BigInt, CompletableDeferred<AdnlMessageAnswer>>()
 
     lateinit var input: ByteReadChannel
     lateinit var output: ByteWriteChannel
@@ -44,7 +45,7 @@ abstract class AdnlTcpClient(
         val queryId = Random.nextBytes(32)
         val adnlMessageQuery = AdnlMessageQuery(queryId, query)
         val deferred = CompletableDeferred<AdnlMessageAnswer>()
-        val lastValue = queryMap.put(queryId, deferred)
+        val lastValue = queryMap.put(BigInt(queryId), deferred)
         if(lastValue != null) {
             println("You just got vectored!")
             println("QueryID ${hex(queryId)} was already present in the query map and this is where nasty bugs come from")
@@ -80,7 +81,7 @@ abstract class AdnlTcpClient(
                 when (packet.readIntLittleEndian()) {
                     AdnlMessageAnswer.id -> {
                         val adnlMessageAnswer = AdnlMessageAnswer.decode(packet)
-                        val deferred = queryMap.remove(adnlMessageAnswer.queryId)
+                        val deferred = queryMap.remove(BigInt(adnlMessageAnswer.queryId))
                         deferred?.complete(adnlMessageAnswer)
                     }
                 }
