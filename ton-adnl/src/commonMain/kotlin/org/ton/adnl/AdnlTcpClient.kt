@@ -30,7 +30,7 @@ abstract class AdnlTcpClient(
 
     protected lateinit var job: Job
     private val sendFlow = MutableSharedFlow<AdnlMessageQuery>()
-    private val queryMap = ConcurrentMap<String, CompletableDeferred<AdnlMessageAnswer>>()
+    private val queryMap = ConcurrentMap<ByteArray, CompletableDeferred<AdnlMessageAnswer>>()
 
     lateinit var input: ByteReadChannel
     lateinit var output: ByteWriteChannel
@@ -43,14 +43,14 @@ abstract class AdnlTcpClient(
         val queryId = Random.nextBytes(32)
         val adnlMessageQuery = AdnlMessageQuery(queryId, query)
         val deferred = CompletableDeferred<AdnlMessageAnswer>()
-        queryMap[hex(queryId)] = deferred
+        queryMap[queryId] = deferred
 
         sendFlow.emit(adnlMessageQuery)
 
         return deferred.await().answer
     }
 
-    suspend fun sendRaw(packet: ByteArray, nonce: ByteArray = Random.nextBytes(32), flush: Boolean = true) {
+    private suspend fun sendRaw(packet: ByteArray, nonce: ByteArray = Random.nextBytes(32), flush: Boolean = true) {
         val length = packet.size + 64
         val hash = sha256(nonce, packet)
         val encryptedPacket = buildPacket {
@@ -74,7 +74,7 @@ abstract class AdnlTcpClient(
                 when (packet.readIntLittleEndian()) {
                     AdnlMessageAnswer.id -> {
                         val adnlMessageAnswer = AdnlMessageAnswer.decode(packet)
-                        val deferred = queryMap.remove(hex(adnlMessageAnswer.queryId))
+                        val deferred = queryMap.remove(adnlMessageAnswer.queryId)
                         deferred?.complete(adnlMessageAnswer)
                     }
                 }
