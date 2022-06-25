@@ -13,6 +13,7 @@ import org.ton.logger.Logger
 import org.ton.logger.PrintLnLogger
 import kotlin.coroutines.CoroutineContext
 import kotlin.random.Random
+import kotlin.system.exitProcess
 
 abstract class AdnlTcpClient(
     val host: String,
@@ -43,7 +44,12 @@ abstract class AdnlTcpClient(
         val queryId = Random.nextBytes(32)
         val adnlMessageQuery = AdnlMessageQuery(queryId, query)
         val deferred = CompletableDeferred<AdnlMessageAnswer>()
-        queryMap[queryId] = deferred
+        val lastValue = queryMap.put(queryId, deferred)
+        if(lastValue != null) {
+            println("You just got vectored!")
+            println("QueryID ${hex(queryId)} was already present in the query map and this is where nasty bugs come from")
+            exitProcess(69)
+        }
 
         sendFlow.emit(adnlMessageQuery)
 
